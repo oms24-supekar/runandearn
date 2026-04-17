@@ -14,16 +14,202 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      activities: {
+        Row: {
+          avg_pace_min_per_km: number | null
+          calories: number
+          created_at: string
+          distance_km: number
+          duration_seconds: number
+          end_time: string
+          id: string
+          points_earned: number
+          route_geojson: Json | null
+          start_time: string
+          user_id: string
+        }
+        Insert: {
+          avg_pace_min_per_km?: number | null
+          calories?: number
+          created_at?: string
+          distance_km?: number
+          duration_seconds?: number
+          end_time: string
+          id?: string
+          points_earned?: number
+          route_geojson?: Json | null
+          start_time: string
+          user_id: string
+        }
+        Update: {
+          avg_pace_min_per_km?: number | null
+          calories?: number
+          created_at?: string
+          distance_km?: number
+          duration_seconds?: number
+          end_time?: string
+          id?: string
+          points_earned?: number
+          route_geojson?: Json | null
+          start_time?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          display_name: string | null
+          id: string
+          total_distance_km: number
+          total_points: number
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id: string
+          total_distance_km?: number
+          total_points?: number
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          total_distance_km?: number
+          total_points?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      rewards: {
+        Row: {
+          active: boolean
+          category: string | null
+          cost_points: number
+          created_at: string
+          description: string | null
+          id: string
+          image_url: string | null
+          stock: number
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          category?: string | null
+          cost_points: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          stock?: number
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          category?: string | null
+          cost_points?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          stock?: number
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      transactions: {
+        Row: {
+          activity_id: string | null
+          created_at: string
+          id: string
+          note: string | null
+          points: number
+          reward_id: string | null
+          type: Database["public"]["Enums"]["transaction_type"]
+          user_id: string
+        }
+        Insert: {
+          activity_id?: string | null
+          created_at?: string
+          id?: string
+          note?: string | null
+          points: number
+          reward_id?: string | null
+          type: Database["public"]["Enums"]["transaction_type"]
+          user_id: string
+        }
+        Update: {
+          activity_id?: string | null
+          created_at?: string
+          id?: string
+          note?: string | null
+          points?: number
+          reward_id?: string | null
+          type?: Database["public"]["Enums"]["transaction_type"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "activities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_reward_id_fkey"
+            columns: ["reward_id"]
+            isOneToOne: false
+            referencedRelation: "rewards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
+      transaction_type: "earn" | "redeem"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +336,9 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+      transaction_type: ["earn", "redeem"],
+    },
   },
 } as const

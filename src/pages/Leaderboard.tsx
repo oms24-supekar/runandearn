@@ -40,9 +40,9 @@ const Leaderboard = () => {
   }, [qc]);
 
   const rankIcon = (rank: number) => {
-    if (rank === 0) return <Trophy className="h-5 w-5 text-yellow-500" />;
-    if (rank === 1) return <Medal className="h-5 w-5 text-gray-400" />;
-    if (rank === 2) return <Award className="h-5 w-5 text-amber-700" />;
+    if (rank === 0) return <Trophy className="h-5 w-5 text-accent" />;
+    if (rank === 1) return <Medal className="h-5 w-5 text-muted-foreground" />;
+    if (rank === 2) return <Award className="h-5 w-5 text-primary" />;
     return <span className="w-5 text-center text-sm font-semibold text-muted-foreground">{rank + 1}</span>;
   };
 

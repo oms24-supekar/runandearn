@@ -79,6 +79,17 @@ const Rewards = () => {
     toast.success(`Redeemed ${title}!`);
     qc.invalidateQueries({ queryKey: ["profile"] });
     qc.invalidateQueries({ queryKey: ["transactions"] });
+
+    // Push notification confirming redemption
+    supabase.functions
+      .invoke("send-push", {
+        body: {
+          title: "Reward redeemed 🎁",
+          body: `${title} — ${cost} points spent`,
+          url: "/profile",
+        },
+      })
+      .catch(() => {});
   };
 
   return (

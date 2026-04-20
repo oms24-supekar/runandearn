@@ -26,6 +26,7 @@ export type Database = {
           points_earned: number
           route_geojson: Json | null
           start_time: string
+          steps: number
           user_id: string
         }
         Insert: {
@@ -39,6 +40,7 @@ export type Database = {
           points_earned?: number
           route_geojson?: Json | null
           start_time: string
+          steps?: number
           user_id: string
         }
         Update: {
@@ -52,6 +54,7 @@ export type Database = {
           points_earned?: number
           route_geojson?: Json | null
           start_time?: string
+          steps?: number
           user_id?: string
         }
         Relationships: []
@@ -83,6 +86,39 @@ export type Database = {
           total_distance_km?: number
           total_points?: number
           updated_at?: string
+        }
+        Relationships: []
+      }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          endpoint: string
+          id: string
+          p256dh: string
+          updated_at: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          endpoint: string
+          id?: string
+          p256dh: string
+          updated_at?: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          endpoint?: string
+          id?: string
+          p256dh?: string
+          updated_at?: string
+          user_agent?: string | null
+          user_id?: string
         }
         Relationships: []
       }

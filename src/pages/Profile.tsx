@@ -11,6 +11,7 @@ import { usePushNotifications } from "@/hooks/usePushNotifications";
 
 const Profile = () => {
   const { user, signOut } = useAuth();
+  const push = usePushNotifications();
 
   const { data: profile } = useQuery({
     queryKey: ["profile", user?.id],
@@ -81,6 +82,33 @@ const Profile = () => {
           variant="primary"
         />
       </div>
+
+      {push.state !== "unsupported" && (
+        <Card className="flex items-center gap-3 p-4 shadow-card">
+          <div className="rounded-full bg-primary/10 p-2 text-primary">
+            {push.state === "granted" ? <Bell className="h-4 w-4" /> : <BellOff className="h-4 w-4" />}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold">Push notifications</p>
+            <p className="text-xs text-muted-foreground">
+              {push.state === "granted"
+                ? "On — get pinged when you earn or redeem"
+                : push.state === "denied"
+                ? "Blocked in your browser settings"
+                : "Get pinged when you earn or redeem"}
+            </p>
+          </div>
+          {push.state === "granted" ? (
+            <Button size="sm" variant="outline" onClick={push.unsubscribe} disabled={push.busy}>
+              Off
+            </Button>
+          ) : (
+            <Button size="sm" onClick={push.subscribe} disabled={push.busy || push.state === "denied"}>
+              Enable
+            </Button>
+          )}
+        </Card>
+      )}
 
       <Tabs defaultValue="activities">
         <TabsList className="grid w-full grid-cols-2">

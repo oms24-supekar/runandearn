@@ -1,17 +1,17 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Play, Pause, Square, MapPin, Timer, Flame, Coins } from "lucide-react";
+import { Play, Pause, Square, MapPin, Timer, Flame, Coins, Footprints, Signal, SignalLow, SignalMedium, SignalHigh } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { StatCard } from "@/components/StatCard";
+import { useStepCounter } from "@/hooks/useStepCounter";
 import { toast } from "sonner";
 
-// 1 point per 100 m
 const POINTS_PER_KM = 10;
 
-type Coord = { lat: number; lng: number; t: number };
+type Coord = { lat: number; lng: number; t: number; acc: number };
 
 const haversineKm = (a: Coord, b: Coord) => {
   const R = 6371;
@@ -35,11 +35,13 @@ const formatTime = (s: number) => {
 const ActivityTracker = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const stepCounter = useStepCounter();
 
   const [status, setStatus] = useState<"idle" | "running" | "paused">("idle");
   const [distanceKm, setDistanceKm] = useState(0);
   const [seconds, setSeconds] = useState(0);
   const [coords, setCoords] = useState<Coord[]>([]);
+  const [accuracy, setAccuracy] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
 
   const watchIdRef = useRef<number | null>(null);
@@ -71,14 +73,23 @@ const ActivityTracker = () => {
     }
     watchIdRef.current = navigator.geolocation.watchPosition(
       (pos) => {
-        const next: Coord = { lat: pos.coords.latitude, lng: pos.coords.longitude, t: Date.now() };
+        const acc = pos.coords.accuracy ?? 999;
+        setAccuracy(acc);
+        // Skip points with bad accuracy (>30m)
+        if (acc > 30) return;
+        const next: Coord = {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          t: Date.now(),
+          acc,
+        };
         setCoords((prev) => {
           const last = prev[prev.length - 1];
           if (last) {
             const d = haversineKm(last, next);
-            // ignore tiny jitter < 5m and unrealistic jumps > 200m/sec
             const dt = (next.t - last.t) / 1000;
-            if (d > 0.005 && d / Math.max(dt, 0.1) < 0.2) {
+            // Ignore jitter < 5m and unrealistic >12m/s (~43km/h)
+            if (d > 0.005 && d / Math.max(dt, 0.1) < 0.012) {
               setDistanceKm((cur) => cur + d);
             }
           }
@@ -100,8 +111,9 @@ const ActivityTracker = () => {
     }
   };
 
-  const handleStart = () => {
+  const handleStart = async () => {
     if (!startGps()) return;
+    await stepCounter.start(); // ok if denied; steps just stay 0
     startTimeRef.current = new Date();
     setStatus("running");
     startTimer();
@@ -111,10 +123,12 @@ const ActivityTracker = () => {
     setStatus("paused");
     stopTimer();
     stopGps();
+    stepCounter.pause();
   };
 
-  const handleResume = () => {
+  const handleResume = async () => {
     if (!startGps()) return;
+    await stepCounter.start();
     setStatus("running");
     startTimer();
   };
@@ -122,9 +136,9 @@ const ActivityTracker = () => {
   const handleStop = async () => {
     stopTimer();
     stopGps();
+    stepCounter.pause();
     if (!user || !startTimeRef.current) return;
     if (distanceKm < 0.01) {
-      // discard tiny runs
       toast.info("Run too short to save");
       reset();
       return;
@@ -132,7 +146,7 @@ const ActivityTracker = () => {
 
     setSaving(true);
     const points = Math.floor(distanceKm * POINTS_PER_KM);
-    const calories = Math.round(distanceKm * 60); // rough estimate
+    const calories = Math.round(distanceKm * 60);
     const pace = distanceKm > 0 ? seconds / 60 / distanceKm : null;
     const endTime = new Date();
 
@@ -146,11 +160,12 @@ const ActivityTracker = () => {
         duration_seconds: seconds,
         avg_pace_min_per_km: pace ? Number(pace.toFixed(2)) : null,
         calories,
+        steps: stepCounter.steps,
         points_earned: points,
-        route_geojson: coords.length > 0 ? {
-          type: "LineString",
-          coordinates: coords.map((c) => [c.lng, c.lat]),
-        } : null,
+        route_geojson:
+          coords.length > 0
+            ? { type: "LineString", coordinates: coords.map((c) => [c.lng, c.lat]) }
+            : null,
       })
       .select()
       .single();
@@ -161,7 +176,7 @@ const ActivityTracker = () => {
       return;
     }
 
-    // Wallet ledger entry
+    let newBalance = 0;
     if (points > 0) {
       await supabase.from("transactions").insert({
         user_id: user.id,
@@ -171,22 +186,33 @@ const ActivityTracker = () => {
         note: `Earned from ${distanceKm.toFixed(2)} km run`,
       });
 
-      // Update profile totals (read then write since no RPC)
       const { data: prof } = await supabase
         .from("profiles")
         .select("total_points, total_distance_km")
         .eq("id", user.id)
         .single();
       if (prof) {
+        newBalance = (prof.total_points ?? 0) + points;
         await supabase
           .from("profiles")
           .update({
-            total_points: (prof.total_points ?? 0) + points,
+            total_points: newBalance,
             total_distance_km: Number((Number(prof.total_distance_km ?? 0) + distanceKm).toFixed(2)),
           })
           .eq("id", user.id);
       }
     }
+
+    // Send a push notification (fire-and-forget)
+    supabase.functions
+      .invoke("send-push", {
+        body: {
+          title: "Run saved! 🎉",
+          body: `+${points} points · ${distanceKm.toFixed(2)} km · ${stepCounter.steps} steps`,
+          url: "/profile",
+        },
+      })
+      .catch(() => {});
 
     toast.success(`Saved! +${points} points earned 🎉`);
     setSaving(false);
@@ -198,11 +224,30 @@ const ActivityTracker = () => {
     setDistanceKm(0);
     setSeconds(0);
     setCoords([]);
+    setAccuracy(null);
+    stepCounter.reset();
     startTimeRef.current = null;
   };
 
   const pace = distanceKm > 0 ? seconds / 60 / distanceKm : 0;
   const projectedPoints = Math.floor(distanceKm * POINTS_PER_KM);
+
+  const SignalIcon = !accuracy
+    ? Signal
+    : accuracy < 10
+    ? SignalHigh
+    : accuracy < 20
+    ? SignalMedium
+    : SignalLow;
+  const signalLabel = !accuracy
+    ? "Acquiring GPS..."
+    : accuracy < 10
+    ? "Strong"
+    : accuracy < 20
+    ? "Good"
+    : accuracy < 30
+    ? "Weak"
+    : "Poor — points filtered";
 
   return (
     <div className="space-y-5 p-4">
@@ -215,7 +260,6 @@ const ActivityTracker = () => {
         </p>
       </header>
 
-      {/* Big distance */}
       <Card className="border-0 bg-gradient-hero p-8 text-center text-primary-foreground shadow-elegant">
         <p className="text-sm opacity-90">Distance</p>
         <p className="mt-2 text-6xl font-bold tabular-nums">{distanceKm.toFixed(2)}</p>
@@ -225,8 +269,33 @@ const ActivityTracker = () => {
       <div className="grid grid-cols-3 gap-3">
         <StatCard label="Time" value={formatTime(seconds)} icon={Timer} />
         <StatCard label="Pace" value={pace > 0 ? pace.toFixed(1) : "—"} unit="/km" icon={MapPin} />
-        <StatCard label="Points" value={projectedPoints} icon={Coins} variant="accent" />
+        <StatCard label="Steps" value={stepCounter.steps} icon={Footprints} variant="primary" />
       </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <StatCard label="Points" value={projectedPoints} icon={Coins} variant="accent" />
+        <Card className="flex items-center gap-3 p-4 shadow-card">
+          <SignalIcon className={`h-5 w-5 ${accuracy && accuracy < 20 ? "text-success" : "text-muted-foreground"}`} />
+          <div className="min-w-0">
+            <p className="text-xs text-muted-foreground">GPS signal</p>
+            <p className="truncate text-sm font-semibold">
+              {signalLabel}
+              {accuracy && <span className="ml-1 text-xs text-muted-foreground">±{Math.round(accuracy)}m</span>}
+            </p>
+          </div>
+        </Card>
+      </div>
+
+      {stepCounter.status === "denied" && (
+        <Card className="p-3 text-xs text-muted-foreground shadow-card">
+          Step counter permission denied. Distance + pace will still be tracked.
+        </Card>
+      )}
+      {stepCounter.status === "unsupported" && (
+        <Card className="p-3 text-xs text-muted-foreground shadow-card">
+          Step counter not supported on this device.
+        </Card>
+      )}
 
       <Card className="p-4 shadow-card">
         <p className="flex items-center gap-2 text-sm text-muted-foreground">

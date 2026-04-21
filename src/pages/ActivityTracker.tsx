@@ -34,7 +34,7 @@ const formatTime = (s: number) => {
 
 const ActivityTracker = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const stepCounter = useStepCounter();
 
   const [status, setStatus] = useState<"idle" | "running" | "paused">("idle");
@@ -204,15 +204,20 @@ const ActivityTracker = () => {
     }
 
     // Send a push notification (fire-and-forget)
-    supabase.functions
-      .invoke("send-push", {
-        body: {
+    if (session?.access_token) {
+      fetch('/api/send-push', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           title: "Run saved! 🎉",
           body: `+${points} points · ${distanceKm.toFixed(2)} km · ${stepCounter.steps} steps`,
           url: "/profile",
-        },
-      })
-      .catch(() => {});
+        }),
+      }).catch(() => {});
+    }
 
     toast.success(`Saved! +${points} points earned 🎉`);
     setSaving(false);

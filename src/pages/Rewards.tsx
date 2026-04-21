@@ -20,7 +20,7 @@ import { toast } from "sonner";
 import { useState } from "react";
 
 const Rewards = () => {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const qc = useQueryClient();
   const [redeeming, setRedeeming] = useState<string | null>(null);
 
@@ -81,15 +81,20 @@ const Rewards = () => {
     qc.invalidateQueries({ queryKey: ["transactions"] });
 
     // Push notification confirming redemption
-    supabase.functions
-      .invoke("send-push", {
-        body: {
+    if (session?.access_token) {
+      fetch('/api/send-push', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           title: "Reward redeemed 🎁",
           body: `${title} — ${cost} points spent`,
           url: "/profile",
-        },
-      })
-      .catch(() => {});
+        }),
+      }).catch(() => {});
+    }
   };
 
   return (

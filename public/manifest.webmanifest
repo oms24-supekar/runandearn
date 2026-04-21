@@ -1,0 +1,23 @@
+{
+  "name": "RUN & EARN",
+  "short_name": "RUN & EARN",
+  "description": "Track your runs with GPS, earn points for every kilometer, and redeem real rewards.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#22c55e",
+  "icons": [
+    {
+      "src": "/pwa-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/pwa-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

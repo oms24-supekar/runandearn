@@ -34,7 +34,12 @@ export const usePushNotifications = () => {
     if (state === "unsupported") return;
     setBusy(true);
     try {
-      const reg = await navigator.serviceWorker.register("/push-sw.js");
+      // In production the PWA service worker (/sw.js) is already registered by registerPwa().
+      // In dev / preview there is no SW, so register the lightweight push-only worker as a fallback.
+      let reg = await navigator.serviceWorker.getRegistration();
+      if (!reg) {
+        reg = await navigator.serviceWorker.register("/push-sw.js");
+      }
       await navigator.serviceWorker.ready;
 
       const permission = await Notification.requestPermission();
@@ -69,7 +74,7 @@ export const usePushNotifications = () => {
     if (!("serviceWorker" in navigator)) return;
     setBusy(true);
     try {
-      const reg = await navigator.serviceWorker.getRegistration("/push-sw.js");
+      const reg = await navigator.serviceWorker.getRegistration();
       const sub = await reg?.pushManager.getSubscription();
       if (sub) {
         await supabase.from("push_subscriptions").delete().eq("endpoint", sub.endpoint);
